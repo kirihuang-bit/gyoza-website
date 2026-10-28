@@ -1,0 +1,11 @@
+{
+  "mode": "take",
+  "name": "課堂測試客",
+  "phone": "0900000000",
+  "store_id": "demo-store",
+  "note": "課堂測試，請勿製作或配送",
+  "items": [
+    { "id": "demo-chive", "qty": 1 },
+    { "id": "demo-pork", "qty": 1 }
+  ]
+}

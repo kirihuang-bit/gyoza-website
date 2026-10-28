@@ -1,0 +1,6 @@
+.DS_Store
+Thumbs.db
+node_modules/
+*.zip
+src_photo/
+.env

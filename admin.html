@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>煎福 訂單管理後台</title>
+<link rel="icon" type="image/png" href="icons/favicon-32.png">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: { wood: { 50: '#f6efe9', 100: '#e8d9cb', 300: '#a8795a', 500: '#6b4529', 700: '#4a2e1a', 900: '#2b1a0f' },
+              ember: { 400: '#ec9549', 500: '#e07a22', 600: '#c46216' }, cream: { 50: '#fffaf2', 100: '#faf3e8' } },
+    fontFamily: { sans: ['"Noto Sans TC"', 'system-ui', 'sans-serif'] } } } }
+</script>
+<style>
+  body { background: #f6efe9; font-family: 'Noto Sans TC', system-ui, sans-serif; color: #2b1a0f; }
+  .col-body { max-height: calc(100vh - 230px); }
+  @keyframes pop { 0% { box-shadow: 0 0 0 0 #e07a22cc; transform: scale(.97); } 100% { box-shadow: 0 0 0 14px #e07a2200; transform: none; } }
+  .fresh { animation: pop 1s ease-out 3; }
+  @media (max-width: 767px) { .col-body { max-height: none; } }
+</style>
+</head>
+<body>
+
+<!-- 登入 -->
+<div id="login" class="flex min-h-screen items-center justify-center p-4">
+  <form id="loginForm" class="w-full max-w-md space-y-4 rounded-3xl bg-white p-8 shadow-xl">
+    <div class="flex items-center gap-3"><span class="flex h-11 w-11 items-center justify-center rounded-full bg-ember-500 text-lg font-black text-white">煎</span>
+      <div><h1 class="text-xl font-bold">訂單管理後台</h1><p class="text-xs text-wood-300">煎福鍋貼專賣</p></div></div>
+    <label class="block text-sm"><span class="mb-1 block font-bold">GAS 網頁應用程式網址</span>
+      <input id="urlIn" type="url" placeholder="https://script.google.com/macros/s/…/exec" class="w-full rounded-xl border border-wood-100 px-4 py-3 text-xs outline-none focus:border-ember-500 focus:ring-2 focus:ring-ember-500/30"></label>
+    <label class="block text-sm"><span class="mb-1 block font-bold">管理金鑰 (ADMIN_KEY)</span>
+      <input id="keyIn" type="password" autocomplete="current-password" class="w-full rounded-xl border border-wood-100 px-4 py-3 outline-none focus:border-ember-500 focus:ring-2 focus:ring-ember-500/30"></label>
+    <p id="loginErr" class="hidden rounded-xl bg-red-50 px-4 py-2 text-sm text-red-700"></p>
+    <button class="w-full rounded-full bg-ember-500 py-3 font-bold text-white hover:bg-ember-600">登入</button>
+    <button type="button" id="demoBtn" class="w-full rounded-full border border-wood-300/50 py-3 text-sm font-bold text-wood-500 hover:bg-wood-50">先看示範資料（不連線）</button>
+    <p class="text-center text-xs text-wood-300">金鑰只存在本分頁的 sessionStorage，關閉分頁即清除。</p>
+  </form>
+</div>
+
+<!-- 看板 -->
+<div id="app" class="hidden">
+  <header class="sticky top-0 z-30 border-b border-wood-100 bg-wood-900 text-cream-50">
+    <div class="mx-auto flex max-w-[1800px] flex-wrap items-center gap-3 px-4 py-3">
+      <span class="flex h-9 w-9 items-center justify-center rounded-full bg-ember-500 font-black">煎</span>
+      <h1 class="text-lg font-bold">訂單管理 <span id="demoTag" class="ml-1 hidden rounded bg-ember-500 px-2 py-0.5 text-xs">示範</span></h1>
+      <div class="ml-auto flex flex-wrap items-center gap-2 text-sm">
+        <input id="search" placeholder="搜尋編號 / 姓名 / 電話" class="w-44 rounded-full bg-white/10 px-4 py-2 text-sm outline-none placeholder:text-cream-50/50 focus:bg-white/20 sm:w-56">
+        <select id="modeFilter" class="rounded-full bg-white/10 px-3 py-2 text-sm outline-none [&>option]:text-black"><option value="">全部方式</option><option>內用</option><option>外帶</option><option>宅配</option></select>
+        <select id="dayFilter" class="rounded-full bg-white/10 px-3 py-2 text-sm outline-none [&>option]:text-black"><option value="today">今日</option><option value="all">全部</option></select>
+        <label class="flex cursor-pointer items-center gap-1.5 rounded-full bg-white/10 px-3 py-2"><input id="soundChk" type="checkbox" checked class="accent-orange-500">提示音</label>
+        <button id="refreshBtn" class="rounded-full bg-ember-500 px-4 py-2 font-bold hover:bg-ember-600">重新整理</button>
+        <button id="logoutBtn" class="rounded-full bg-white/10 px-4 py-2 hover:bg-white/20">登出</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-[1800px] px-4 py-4">
+    <div id="stats" class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4"></div>
+    <p id="updated" class="mb-2 text-xs text-wood-300"></p>
+    <div id="board" class="grid gap-3 md:auto-cols-[minmax(270px,1fr)] md:grid-flow-col md:overflow-x-auto md:pb-3"></div>
+  </main>
+</div>
+
+<div id="toasts" class="pointer-events-none fixed inset-x-0 top-16 z-50 flex flex-col items-center gap-2 px-4"></div>
+
+<script>
+/* ============================================================
+   設定與狀態
+   ============================================================ */
+const $ = (s, r = document) => r.querySelector(s);
+const money = n => 'NT$' + Number(n || 0).toLocaleString('en-US');
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const STATUSES = ['新訂單', '製作中', '待取餐', '配送中', '已完成', '已取消'];
+const COL_STYLE = { '新訂單': 'bg-amber-400', '製作中': 'bg-orange-500', '待取餐': 'bg-emerald-500', '配送中': 'bg-sky-500', '已完成': 'bg-stone-400', '已取消': 'bg-red-400' };
+const POLL_MS = 20000;
+
+let api = { url: '', key: '', demo: false };
+let orders = [];
+let known = new Set();
+let firstLoad = true;
+let pollTimer = null;
+let freshSet = new Set();
+
+/* ============================================================
+   API
+   ============================================================ */
+async function call(payload) {
+  if (api.demo) return demoApi(payload);
+  const r = await fetch(api.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ ...payload, key: api.key }) });
+  const j = await r.json();
+  if (!j.ok) { const e = new Error(j.error || '請求失敗'); e.code = j.code; throw e; }
+  return j;
+}
+
+/* 示範模式：本機假資料 */
+const localIso = ago => new Date(Date.now() - ago - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+let demoOrders = null;
+function demoApi(p) {
+  if (!demoOrders) {
+    const iso = m => localIso(m * 60000);
+    const it = (n, pr, q) => ({ name: n, price: pr, qty: q });
+    demoOrders = [
+      { orderNo: 'JF-DEMO-005', createdAt: iso(2), status: '新訂單', mode: '外帶', name: '林小姐', phone: '0912345678', email: '', store: '旗艦店 — 台北市中正區忠孝西路一段 100 號', address: '', note: '少辣', subtotal: 270, fee: 0, total: 270, items: [it('招牌豬肉鍋貼 (10入)', 85, 2), it('酸辣湯', 55, 2)] },
+      { orderNo: 'JF-DEMO-004', createdAt: iso(9), status: '製作中', mode: '內用', name: '陳先生', phone: '0922333444', email: 'chen@example.com', store: '信義店', address: '', note: '', subtotal: 195, fee: 20, total: 215, items: [it('韭菜豬肉鍋貼 (10入)', 90, 1), it('蔥油餅', 45, 1), it('古早味紅茶', 30, 2)] },
+      { orderNo: 'JF-DEMO-003', createdAt: iso(25), status: '待取餐', mode: '外帶', name: '王小明', phone: '0933555666', email: '', store: '旗艦店', address: '', note: '', subtotal: 110, fee: 0, total: 110, items: [it('麻辣牛肉鍋貼 (10入)', 110, 1)] },
+      { orderNo: 'JF-DEMO-002', createdAt: iso(60), status: '配送中', mode: '宅配', name: '張太太', phone: '0955111222', email: '', store: '', address: '台北市大安區和平東路二段 10 號 5 樓', note: '請放管理室', subtotal: 1360, fee: 0, total: 1360, items: [it('招牌招財鍋貼禮盒', 680, 2)] },
+      { orderNo: 'JF-DEMO-001', createdAt: iso(120), status: '已完成', mode: '內用', name: '李先生', phone: '0966777888', email: '', store: '信義店', address: '', note: '', subtotal: 180, fee: 18, total: 198, items: [it('鮮肉水餃 (12入)', 90, 2)] }
+    ];
+  }
+  if (p.action === 'status') { const o = demoOrders.find(x => x.orderNo === p.orderNo); if (o) o.status = p.status; return Promise.resolve({ ok: true }); }
+  // 模擬新訂單偶爾進來
+  if (Math.random() < .25) {
+    const n = 'JF-DEMO-' + String(demoOrders.length + 1).padStart(3, '0');
+    demoOrders.unshift({ orderNo: n, createdAt: localIso(0), status: '新訂單', mode: '外帶', name: '新客人', phone: '0900000000', email: '', store: '旗艦店', address: '', note: '', subtotal: 85, fee: 0, total: 85, items: [{ name: '招牌豬肉鍋貼 (10入)', price: 85, qty: 1 }] });
+  }
+  return Promise.resolve({ ok: true, statuses: STATUSES, orders: JSON.parse(JSON.stringify(demoOrders)) });
+}
+
+/* ============================================================
+   登入
+   ============================================================ */
+function showApp() { $('#login').classList.add('hidden'); $('#app').classList.remove('hidden'); $('#demoTag').classList.toggle('hidden', !api.demo); }
+function logout() { sessionStorage.removeItem('jf_key'); clearInterval(pollTimer); location.reload(); }
+
+$('#urlIn').value = localStorage.getItem('jf_url') || '';
+$('#loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const url = $('#urlIn').value.trim(), key = $('#keyIn').value;
+  const err = $('#loginErr'); err.classList.add('hidden');
+  if (!url || !key) { err.textContent = '請輸入網址與金鑰'; err.classList.remove('hidden'); return; }
+  api = { url, key, demo: false };
+  try {
+    await load(true);
+    localStorage.setItem('jf_url', url); sessionStorage.setItem('jf_key', key);
+    showApp(); startPolling();
+  } catch (x) {
+    err.textContent = x.code === 'AUTH' ? '金鑰不正確' : '連線失敗：' + (x.message === 'Failed to fetch' ? '請確認網址與部署權限（存取權須為「所有人」）' : x.message);
+    err.classList.remove('hidden');
+  }
+});
+$('#demoBtn').addEventListener('click', async () => { api = { url: '', key: '', demo: true }; await load(true); showApp(); startPolling(); });
+$('#logoutBtn').addEventListener('click', logout);
+
+/* 重新整理頁面時自動登入 */
+(async function auto() {
+  const k = sessionStorage.getItem('jf_key'), u = localStorage.getItem('jf_url');
+  if (!k || !u) return;
+  api = { url: u, key: k, demo: false };
+  try { await load(true); showApp(); startPolling(); } catch (e) { sessionStorage.removeItem('jf_key'); }
+})();
+
+/* ============================================================
+   載入與輪詢
+   ============================================================ */
+async function load(throwOnError) {
+  try {
+    const j = await call({ action: 'list' });
+    const incoming = j.orders || [];
+    const newOnes = incoming.filter(o => !known.has(o.orderNo) && o.status === '新訂單');
+    if (!firstLoad && newOnes.length) {
+      newOnes.forEach(o => freshSet.add(o.orderNo));
+      notifyNew(newOnes);
+    }
+    incoming.forEach(o => known.add(o.orderNo));
+    firstLoad = false;
+    orders = incoming;
+    $('#updated').textContent = '最後更新：' + new Date().toLocaleTimeString('zh-TW') + '（每 20 秒自動更新）';
+    render();
+  } catch (e) {
+    if (throwOnError) throw e;
+    $('#updated').textContent = '⚠ 更新失敗：' + e.message + '，將自動重試';
+  }
+}
+function startPolling() {
+  clearInterval(pollTimer);
+  pollTimer = setInterval(() => { if (!document.hidden) load(); }, POLL_MS);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+}
+$('#refreshBtn').addEventListener('click', () => load().then(() => toast('已更新')));
+
+/* ============================================================
+   新訂單提示（音效 + 標題閃爍 + Toast）
+   ============================================================ */
+let audioCtx;
+function beep() {
+  if (!$('#soundChk').checked) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    [880, 1175].forEach((f, i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.frequency.value = f; o.connect(g); g.connect(audioCtx.destination);
+      const t = audioCtx.currentTime + i * .18;
+      g.gain.setValueAtTime(.001, t); g.gain.exponentialRampToValueAtTime(.25, t + .02); g.gain.exponentialRampToValueAtTime(.001, t + .16);
+      o.start(t); o.stop(t + .17);
+    });
+  } catch (e) {}
+}
+function notifyNew(list) {
+  beep(); toast(`🔔 ${list.length} 筆新訂單：${list.map(o => o.orderNo).join('、')}`);
+  const base = document.title; let n = 0;
+  const t = setInterval(() => { document.title = n++ % 2 ? base : `(${list.length}) 新訂單！`; if (n > 8 || !document.hidden && n > 3) { clearInterval(t); document.title = base; } }, 700);
+}
+function toast(msg, bad) {
+  const el = document.createElement('div');
+  el.className = 'pointer-events-auto rounded-full px-5 py-3 text-sm font-medium text-white shadow-xl ' + (bad ? 'bg-red-600' : 'bg-wood-700');
+  el.textContent = msg; $('#toasts').appendChild(el);
+  setTimeout(() => { el.style.transition = 'opacity .3s'; el.style.opacity = 0; setTimeout(() => el.remove(), 300); }, 2600);
+}
+
+/* ============================================================
+   篩選、統計、渲染
+   ============================================================ */
+const isToday = o => (o.createdAt || '').slice(0, 10) === new Date().toLocaleDateString('sv-SE');
+function filtered() {
+  const q = $('#search').value.trim().toLowerCase(), m = $('#modeFilter').value, d = $('#dayFilter').value;
+  return orders.filter(o => (d === 'all' || isToday(o)) && (!m || o.mode === m) &&
+    (!q || [o.orderNo, o.name, o.phone].some(v => String(v).toLowerCase().includes(q))));
+}
+['search', 'modeFilter', 'dayFilter'].forEach(id => $('#' + id).addEventListener('input', render));
+
+function nextStatus(o) {
+  return { '新訂單': '製作中', '製作中': o.mode === '宅配' ? '配送中' : '待取餐', '待取餐': '已完成', '配送中': '已完成' }[o.status];
+}
+
+function renderStats(list) {
+  const valid = list.filter(o => o.status !== '已取消');
+  const rev = valid.reduce((s, o) => s + Number(o.total), 0);
+  const pending = list.filter(o => o.status === '新訂單' || o.status === '製作中').length;
+  const cards = [['訂單數', valid.length + ' 筆'], ['營業額', money(rev)], ['平均客單', money(valid.length ? Math.round(rev / valid.length) : 0)], ['待處理', pending + ' 筆']];
+  $('#stats').innerHTML = cards.map(c => `<div class="rounded-2xl bg-white p-4 shadow-sm"><p class="text-xs text-wood-300">${c[0]}</p><p class="mt-1 text-2xl font-black text-wood-700">${c[1]}</p></div>`).join('');
+}
+
+function card(o) {
+  const time = (o.createdAt || '').slice(11, 16);
+  const nxt = nextStatus(o);
+  const where = o.mode === '宅配' ? o.address : o.store;
+  return `<article data-no="${esc(o.orderNo)}" class="rounded-2xl bg-white p-4 shadow-sm ${freshSet.has(o.orderNo) ? 'fresh ring-2 ring-ember-500' : ''}">
+    <div class="flex items-start justify-between gap-2">
+      <div><p class="font-mono text-sm font-bold">${esc(o.orderNo)}</p><p class="text-xs text-wood-300">${time} · ${esc(o.mode)}</p></div>
+      <p class="font-black text-ember-600">${money(o.total)}</p>
+    </div>
+    <p class="mt-2 text-sm font-bold">${esc(o.name)} <a href="tel:${esc(o.phone)}" class="ml-1 font-normal text-wood-500 underline">${esc(o.phone)}</a></p>
+    ${where ? `<p class="mt-0.5 text-xs text-wood-500">${esc(where)}</p>` : ''}
+    <ul class="mt-2 space-y-0.5 border-t border-dashed border-wood-100 pt-2 text-sm">
+      ${(o.items || []).map(i => `<li class="flex justify-between gap-2"><span>${esc(i.name)}</span><b>× ${esc(i.qty)}</b></li>`).join('') || '<li class="text-xs text-wood-300">（無明細）</li>'}
+    </ul>
+    ${o.note ? `<p class="mt-2 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-800">備註：${esc(o.note)}</p>` : ''}
+    <div class="mt-3 flex items-center gap-2">
+      ${nxt ? `<button data-set="${nxt}" class="flex-1 rounded-full bg-wood-700 py-2 text-sm font-bold text-white hover:bg-ember-500">→ ${nxt}</button>` : '<span class="flex-1"></span>'}
+      <select data-sel aria-label="變更狀態" class="rounded-full border border-wood-100 bg-white px-2 py-2 text-xs">
+        ${STATUSES.map(s => `<option ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}
+      </select>
+    </div>
+  </article>`;
+}
+
+function render() {
+  const list = filtered();
+  renderStats(list);
+  const showCancelled = list.some(o => o.status === '已取消');
+  const cols = STATUSES.filter(s => s !== '已取消' || showCancelled);
+  $('#board').innerHTML = cols.map(s => {
+    const items = list.filter(o => o.status === s);
+    return `<section class="rounded-2xl bg-wood-100/60 p-2">
+      <h2 class="flex items-center gap-2 px-2 py-2 text-sm font-bold"><span class="h-3 w-3 rounded-full ${COL_STYLE[s]}"></span>${s}<span class="ml-auto rounded-full bg-white px-2 text-xs">${items.length}</span></h2>
+      <div class="col-body space-y-2 overflow-y-auto p-1">${items.map(card).join('') || '<p class="py-6 text-center text-xs text-wood-300">沒有訂單</p>'}</div>
+    </section>`;
+  }).join('');
+}
+
+/* ============================================================
+   變更狀態（樂觀更新，失敗則還原）
+   ============================================================ */
+async function setStatus(orderNo, status) {
+  const o = orders.find(x => x.orderNo === orderNo); if (!o || o.status === status) return;
+  if (status === '已取消' && !confirm(`確定取消訂單 ${orderNo}？`)) { render(); return; }
+  const prev = o.status; o.status = status; freshSet.delete(orderNo); render();
+  try { await call({ action: 'status', orderNo, status }); toast(`${orderNo} → ${status}`); }
+  catch (e) { o.status = prev; render(); toast('更新失敗：' + e.message, true); }
+}
+$('#board').addEventListener('click', e => {
+  const b = e.target.closest('[data-set]'); if (!b) return;
+  setStatus(b.closest('[data-no]').dataset.no, b.dataset.set);
+});
+$('#board').addEventListener('change', e => {
+  const s = e.target.closest('[data-sel]'); if (!s) return;
+  setStatus(s.closest('[data-no]').dataset.no, s.value);
+});
+</script>
+</body>
+</html>

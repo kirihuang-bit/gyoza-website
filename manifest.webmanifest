@@ -1,0 +1,21 @@
+{
+  "name": "煎福鍋貼專賣",
+  "short_name": "煎福鍋貼",
+  "description": "金黃酥脆，傳承手藝的極致美味。線上點餐、冷凍禮盒、門市資訊。",
+  "lang": "zh-Hant",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#2b1a0f",
+  "theme_color": "#2b1a0f",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "線上點餐", "url": "./index.html#menu", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "門市據點", "url": "./index.html#locations", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
